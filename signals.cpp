@@ -5,6 +5,7 @@
 #include <fstream>
 #include <complex>
 #include <time.h>
+#include <map>
 
 using namespace std;
 const double pi = 3.141592;
@@ -69,7 +70,6 @@ vector<double> square_signal(double F, double T, double phi, double t, int N) {
 
 vector<double> double_square_signal(double t, double F, int N) {
     vector<double> signal(N * F, 0.0);
-    srand(time(0));
     int pulse1_start = rand() % static_cast<int>(N * F - t * F);
     int pulse2_start;
     do {
@@ -196,7 +196,6 @@ vector<double> pad_to_power_of_two(const vector<double>& signal) {
 
 vector<double> impulse_noise(const vector<double>& signal, double P) {
     vector<double> noisy_signal = signal;
-    srand(time(0));
     for (int i = 0; i < signal.size(); i++) {
         double rand_prob = static_cast<double>(rand()) / RAND_MAX;
         if( rand_prob > P) {
@@ -206,22 +205,64 @@ vector<double> impulse_noise(const vector<double>& signal, double P) {
     return noisy_signal;
 }
 
+double box_muller() {
+    double s;
+    double x, y;
+    do {
+        x = static_cast<double>(rand()) / RAND_MAX * 2 - 1;
+        y = static_cast<double>(rand()) / RAND_MAX * 2 - 1;
+        s = x * x + y * y;
+    } while (abs(s) < 1e-10 || s > 1);
+    double z0 = x * sqrt(-2 * log(s) / s);
+    return z0;
+}
+
+vector<double> gaussian_noise(const vector<double>& signal, double S, double M) {
+    vector<double> noisy_signal = signal;
+    for (int i = 0; i < signal.size(); i++) {
+        noisy_signal[i] += box_muller() * sqrt(S) + M;
+    }
+    return noisy_signal;
+}
+
+void histogram(const vector<double>& signal, int num_bins, const string& filename) {
+    map<int, int> hist;
+
+    double min_value = *min_element(signal.begin(), signal.end());
+    double max_value = *max_element(signal.begin(), signal.end());
+    double bin_width = (max_value - min_value) / num_bins;
+
+    for (double value : signal) {
+        int bin_index = static_cast<int>((value - min_value) / bin_width);
+        hist[bin_index] += 1;
+    }
+    
+    std::ofstream csv_file;
+    csv_file.open(filename);
+    csv_file << "bin" << "," << "count\n";
+    for (int i = 0; i < num_bins; i++) {
+        csv_file << i << "," << hist[i] << "\n";
+    }
+}
+
 
 int main()
 {
+    srand(time(0));
     double T = 2.0;
     double phi = 0.0;
     double F = 48.0;
     double t = 1;
-    int N = 4;
+    int N = 6;
     double P = 0.05;
-    double S = 1.0;
-
+    double S = 0.01;
+    double M = 0.0;
+    int num_bins = 50;
     // Process sine signal
     vector<double> sin_sig = sin_signal(F, T, phi, N);
-    // sin_sig = pad_to_power_of_two(sin_sig);
-    // vector<uint16_t> q_sin_sig = quantize(sin_sig);
-    // save_to_csv(q_sin_sig, F, N, "sin_signal_sampled.csv");
+    sin_sig = pad_to_power_of_two(sin_sig);
+    vector<uint16_t> q_sin_sig = quantize(sin_sig);
+    save_to_csv(q_sin_sig, F, N, "sin_signal_sampled.csv");
     // vector<complex<double>> sin_sig_complex(sin_sig.size());
     // transform(sin_sig.begin(), sin_sig.end(), sin_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
     // FftDit(sin_sig_complex.data(), sin_sig_complex.size(), log2(sin_sig_complex.size()), 1);
@@ -231,9 +272,9 @@ int main()
 
     // Process triangle signal
     vector<double> triangle_sig = triangle_signal(F, T, phi, t, N);
-    // triangle_sig = pad_to_power_of_two(triangle_sig);
-    // vector<uint16_t> q_triangle_sig = quantize(triangle_sig);
-    // save_to_csv(q_triangle_sig, F, N, "triangle_signal_sampled.csv");
+    triangle_sig = pad_to_power_of_two(triangle_sig);
+    vector<uint16_t> q_triangle_sig = quantize(triangle_sig);
+    save_to_csv(q_triangle_sig, F, N, "triangle_signal_sampled.csv");
     // vector<complex<double>> triangle_sig_complex(triangle_sig.size());
     // transform(triangle_sig.begin(), triangle_sig.end(), triangle_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
     // FftDit(triangle_sig_complex.data(), triangle_sig_complex.size(), log2(triangle_sig_complex.size()), 1);
@@ -243,9 +284,9 @@ int main()
 
     // Process square signal
     vector<double> square_sig = square_signal(F, T, phi, t, N);
-    // square_sig = pad_to_power_of_two(square_sig);
-    // vector<uint16_t> q_square_sig = quantize(square_sig);
-    // save_to_csv(q_square_sig, F, N, "square_signal_sampled.csv");
+    square_sig = pad_to_power_of_two(square_sig);
+    vector<uint16_t> q_square_sig = quantize(square_sig);
+    save_to_csv(q_square_sig, F, N, "square_signal_sampled.csv");
     // vector<complex<double>> square_sig_complex(square_sig.size());
     // transform(square_sig.begin(), square_sig.end(), square_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
     // FftDit(square_sig_complex.data(), square_sig_complex.size(), log2(square_sig_complex.size()), 1);
@@ -280,6 +321,29 @@ int main()
     //Creating noisy double square signal
     vector<double> noisy_double_square_sig = impulse_noise(double_square_sig, P);
     save_to_csv_double(noisy_double_square_sig, F, N, "noisy_double_square_signal.csv");
+
+    // GAUSS
+    //Creating noisy gaussian signal
+    vector<double> noisy_gaussian_sin_sig = gaussian_noise(sin_sig, S, M);
+    save_to_csv_double(noisy_gaussian_sin_sig, F, N, "noisy_gaussian_sin_signal.csv");
+
+    //Creating noisy gaussian triangle signal
+    vector<double> noisy_gaussian_triangle_sig = gaussian_noise(triangle_sig, S, M);
+    save_to_csv_double(noisy_gaussian_triangle_sig, F, N, "noisy_gaussian_triangle_signal.csv");
+
+    //Creating noisy gaussian square signal
+    vector<double> noisy_gaussian_square_sig = gaussian_noise(square_sig, S, M);
+    save_to_csv_double(noisy_gaussian_square_sig, F, N, "noisy_gaussian_square_signal.csv");
+
+    //Creating noisy gaussian double square signal
+    vector<double> noisy_gaussian_double_square_sig = gaussian_noise(double_square_sig, S, M);
+    save_to_csv_double(noisy_gaussian_double_square_sig, F, N, "noisy_gaussian_double_square_signal.csv");
+
+    //Histograms
+    histogram(noisy_gaussian_sin_sig, num_bins, "histogram_noisy_gaussian_sin_signal.csv");
+    histogram(noisy_gaussian_triangle_sig, num_bins, "histogram_noisy_gaussian_triangle_signal.csv");
+    histogram(noisy_gaussian_square_sig, num_bins, "histogram_noisy_gaussian_square_signal.csv");
+    histogram(noisy_gaussian_double_square_sig, num_bins, "histogram_noisy_gaussian_double_square_signal.csv");
 
     return 0;
 }
