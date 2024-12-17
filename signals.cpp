@@ -124,8 +124,6 @@ void ComplexBitReverse(complex<double>* data, int size) {
     }
 }
 
-
-
 void FftDit(complex<double>* data, int size, int sizeLog2, int dir ) {
     ComplexBitReverse(data, size);
     int ptsInLeftDft,ptsInRightDft = 1;
@@ -196,10 +194,16 @@ vector<double> pad_to_power_of_two(const vector<double>& signal) {
 
 vector<double> impulse_noise(const vector<double>& signal, double P) {
     vector<double> noisy_signal = signal;
+
+    double max_value = *max_element(signal.begin(), signal.end());
+    double min_value = *min_element(signal.begin(), signal.end());
+
     for (int i = 0; i < signal.size(); i++) {
         double rand_prob = static_cast<double>(rand()) / RAND_MAX;
-        if( rand_prob > P) {
-            noisy_signal[i] += static_cast<double>(rand()) / RAND_MAX * 0.5 - 0.25;
+        if(rand_prob > P) {
+            double prob = static_cast<double>(rand()) / RAND_MAX;
+            if (prob > 0.5) noisy_signal[i] = max_value;
+            else noisy_signal[i] = min_value;
         }
     }
     return noisy_signal;
