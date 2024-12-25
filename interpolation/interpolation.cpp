@@ -16,29 +16,43 @@ vector<double> sin_signal(double F, double T, double phi, int N) {
     return signal;
 }
 
-vector<double> zero_order_interpolation(const vector<double>& signal, int factor) {
+vector<double> zero_order_interpolation(const vector<double>& signal, float factor) {
     vector<double> interpolated_signal;
-    for (double value : signal) {
-        for (int i = 0; i < factor; ++i) {
-            interpolated_signal.push_back(value);
-        }
+    
+    int interpolated_size = static_cast<int>(ceil(signal.size() * factor));
+    interpolated_signal.reserve(interpolated_size);
+
+    for (int i = 0; i < interpolated_size; ++i) {
+        int original_index = static_cast<int>(floor(i / factor));
+        interpolated_signal.push_back(signal[original_index]);
     }
+
     return interpolated_signal;
 }
 
-vector<double> first_order_interpolation(const vector<double>& signal, int factor) {
+vector<double> first_order_interpolation(const vector<double>& signal, float factor) {
     vector<double> interpolated_signal;
+    
+    int interpolated_size = static_cast<int>(ceil(signal.size() * factor));
+    interpolated_signal.reserve(interpolated_size);
+
     for (size_t i = 0; i < signal.size() - 1; ++i) {
         double start = signal[i];
         double end = signal[i + 1];
-        for (int j = 0; j < factor; ++j) {
-            double interpolated_value = start + j * (end - start) / factor;
+
+        int num_points = static_cast<int>(ceil(factor));
+        for (int j = 0; j < num_points; ++j) {
+            double t = j / factor;
+            double interpolated_value = start + t * (end - start);
             interpolated_signal.push_back(interpolated_value);
         }
     }
+
     interpolated_signal.push_back(signal.back());
+
     return interpolated_signal;
 }
+
 
 void save_signal_to_csv(const vector<double>& signal, const string& filename) {
     ofstream file(filename);
@@ -57,7 +71,7 @@ int main() {
     vector<double> sin_signal_data = sin_signal(F, T, phi, N);
 
     vector<double> signal = {1, 2, 3, 5, 8, 3, 5, 7, 1, 2, 10, 15, 20, 20, 9, 1};
-    int interpolation_factor = 4;
+    float interpolation_factor = 4.4;
 
     vector<double> zero_order_signal = zero_order_interpolation(signal, interpolation_factor);
     vector<double> first_order_signal = first_order_interpolation(signal, interpolation_factor);

@@ -149,12 +149,16 @@ void FftDit(complex<double>* data, int size, int sizeLog2, int dir ) {
 void save_to_csv_magnitude(const vector<double>& signal, double F, int N, const string& filename) {
     std::ofstream csv_file;
     csv_file.open(filename);
-    csv_file << "magnitude\n";
+    csv_file << "frequency,magnitude\n";
+
     for (int i = 0; i < F * N; i++) {
-        csv_file << signal[i] << "\n";
+        double frequency = (i * F) / N;
+        csv_file << frequency << "," << signal[i] << "\n";
     }
+    
     csv_file.close();
 }
+
 
 void save_to_csv_double(const vector<double>& signal, double F, int N, const string& filename) {
     std::ofstream csv_file;
@@ -253,11 +257,11 @@ void histogram(const vector<double>& signal, int num_bins, const string& filenam
 int main()
 {
     srand(time(0));
-    double T = 2.0;
+    double T = 4.0;
     double phi = 0.0;
-    double F = 48.0;
+    double F = 64.0;
     double t = 1;
-    int N = 6;
+    int N = 8;
     double P = 0.05;
     double S = 0.01;
     double M = 0.0;
@@ -267,36 +271,36 @@ int main()
     sin_sig = pad_to_power_of_two(sin_sig);
     vector<uint16_t> q_sin_sig = quantize(sin_sig);
     save_to_csv(q_sin_sig, F, N, "sin_signal_sampled.csv");
-    // vector<complex<double>> sin_sig_complex(sin_sig.size());
-    // transform(sin_sig.begin(), sin_sig.end(), sin_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
-    // FftDit(sin_sig_complex.data(), sin_sig_complex.size(), log2(sin_sig_complex.size()), 1);
-    // vector<double> sin_magnitude(sin_sig_complex.size());
-    // transform(sin_sig_complex.begin(), sin_sig_complex.end(), sin_magnitude.begin(), [](complex<double> x) { return abs(x); });
-    // save_to_csv_magnitude(sin_magnitude, F, N, "sin_signal_complex.csv");
+    vector<complex<double>> sin_sig_complex(sin_sig.size());
+    transform(sin_sig.begin(), sin_sig.end(), sin_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
+    FftDit(sin_sig_complex.data(), sin_sig_complex.size(), log2(sin_sig_complex.size()), 1);
+    vector<double> sin_magnitude(sin_sig_complex.size());
+    transform(sin_sig_complex.begin(), sin_sig_complex.end(), sin_magnitude.begin(), [](complex<double> x) { return abs(x); });
+    save_to_csv_magnitude(sin_magnitude, F, N, "sin_signal_complex.csv");
 
     // Process triangle signal
     vector<double> triangle_sig = triangle_signal(F, T, phi, t, N);
     triangle_sig = pad_to_power_of_two(triangle_sig);
     vector<uint16_t> q_triangle_sig = quantize(triangle_sig);
     save_to_csv(q_triangle_sig, F, N, "triangle_signal_sampled.csv");
-    // vector<complex<double>> triangle_sig_complex(triangle_sig.size());
-    // transform(triangle_sig.begin(), triangle_sig.end(), triangle_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
-    // FftDit(triangle_sig_complex.data(), triangle_sig_complex.size(), log2(triangle_sig_complex.size()), 1);
-    // vector<double> triangle_magnitude(triangle_sig_complex.size());
-    // transform(triangle_sig_complex.begin(), triangle_sig_complex.end(), triangle_magnitude.begin(), [](complex<double> x) { return abs(x); });
-    // save_to_csv_magnitude(triangle_magnitude, F, N, "triangle_signal_complex.csv");
+    vector<complex<double>> triangle_sig_complex(triangle_sig.size());
+    transform(triangle_sig.begin(), triangle_sig.end(), triangle_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
+    FftDit(triangle_sig_complex.data(), triangle_sig_complex.size(), log2(triangle_sig_complex.size()), 1);
+    vector<double> triangle_magnitude(triangle_sig_complex.size());
+    transform(triangle_sig_complex.begin(), triangle_sig_complex.end(), triangle_magnitude.begin(), [](complex<double> x) { return abs(x); });
+    save_to_csv_magnitude(triangle_magnitude, F, N, "triangle_signal_complex.csv");
 
     // Process square signal
     vector<double> square_sig = square_signal(F, T, phi, t, N);
     square_sig = pad_to_power_of_two(square_sig);
     vector<uint16_t> q_square_sig = quantize(square_sig);
     save_to_csv(q_square_sig, F, N, "square_signal_sampled.csv");
-    // vector<complex<double>> square_sig_complex(square_sig.size());
-    // transform(square_sig.begin(), square_sig.end(), square_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
-    // FftDit(square_sig_complex.data(), square_sig_complex.size(), log2(square_sig_complex.size()), 1);
-    // vector<double> square_magnitude(square_sig_complex.size());
-    // transform(square_sig_complex.begin(), square_sig_complex.end(), square_magnitude.begin(), [](complex<double> x) { return abs(x); });
-    // save_to_csv_magnitude(square_magnitude, F, N, "square_signal_complex.csv");
+    vector<complex<double>> square_sig_complex(square_sig.size());
+    transform(square_sig.begin(), square_sig.end(), square_sig_complex.begin(), [](double x) { return complex<double>(x, 0.0); });
+    FftDit(square_sig_complex.data(), square_sig_complex.size(), log2(square_sig_complex.size()), 1);
+    vector<double> square_magnitude(square_sig_complex.size());
+    transform(square_sig_complex.begin(), square_sig_complex.end(), square_magnitude.begin(), [](complex<double> x) { return abs(x); });
+    save_to_csv_magnitude(square_magnitude, F, N, "square_signal_complex.csv");
 
     // Process double square signal
     vector<double> double_square_sig = double_square_signal(t, F, N);

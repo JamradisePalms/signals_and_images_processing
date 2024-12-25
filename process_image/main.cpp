@@ -7,6 +7,9 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
+#include <queue>
+#include <unordered_set>
+#include <unordered_map>
 #include "stb_image.h"
 #include "stb_image_write.h"
 #include <cmath>
@@ -27,6 +30,10 @@ void ResizeNearestNeighbor(const unsigned char* pbIn, int lWidthIn, int lHeightI
 void MedianFilter2D(const unsigned char* pSrc, unsigned char* pRes, int iWidth, int iHeight, int iKernelSize);
 
 void AddNoise(const unsigned char* pSrc, unsigned char* pRes, int iWidth, int iHeight);
+
+void ThresholdSegmentation(const unsigned char* pSrc, unsigned char* pRes, int iWidth, int iHeight, unsigned char threshold);
+
+void ConnectedComponentLabeling(const unsigned char* pBin, unsigned char* pLabel, int iWidth, int iHeight, int connectivity);
                            
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -74,11 +81,11 @@ int main(int argc, char *argv[]) {
               << " bits per pixel" << std::endl;
 
     // initialize data for output:
-    // int output_width = input_width,
-    //     output_height = input_height,
-    //     output_bytes_per_pixel = input_bytes_per_pixel;
-    // size_t output_bytes_num = output_width * output_height * output_bytes_per_pixel;
-    // unsigned char *output_image_data = new unsigned char[output_bytes_num];
+    int output_width = input_width,
+        output_height = input_height,
+        output_bytes_per_pixel = input_bytes_per_pixel;
+    size_t output_bytes_num = output_width * output_height * output_bytes_per_pixel;
+    unsigned char *output_image_data = new unsigned char[output_bytes_num];
 
     // process input image, result of processing in output image data
 
@@ -137,23 +144,33 @@ int main(int argc, char *argv[]) {
     // ResizeNearestNeighbor(input_image_data, input_width, input_height, output_image_data, output_width, output_height);
 
     // MEDIAN FILTERING
-    int output_width = input_width,
-        output_height = input_height,
-        output_bytes_per_pixel = input_bytes_per_pixel;
-    size_t output_bytes_num = output_width * output_height * output_bytes_per_pixel;
-    unsigned char *output_image_data = new unsigned char[output_bytes_num];
-    int aperture = 5;
-    AddNoise(input_image_data, output_image_data, input_width, input_height);
-    MedianFilter2D(input_image_data, output_image_data, input_width, input_height, aperture);
+    // int output_width = input_width,
+    //     output_height = input_height,
+    //     output_bytes_per_pixel = input_bytes_per_pixel;
+    // size_t output_bytes_num = output_width * output_height * output_bytes_per_pixel;
+    // unsigned char *output_image_data = new unsigned char[output_bytes_num];
+    // int aperture = 5;
+    // AddNoise(input_image_data, output_image_data, input_width, input_height);
+    // MedianFilter2D(input_image_data, output_image_data, input_width, input_height, aperture);
+
+    // SEGMENTATION
+
+    ThresholdSegmentation(input_image_data, output_image_data, input_width, input_height, 86);
+
+    unsigned char *labeled_data = new unsigned char[output_bytes_num];
+    for (int i = 0; i < output_bytes_num; ++i) labeled_data[i] = 0;
+    
+    ConnectedComponentLabeling(output_image_data, labeled_data, input_width, input_height, 4);
+    output_image_data = labeled_data;
 
     // write output image to PNG file:
-    int write_res = stbi_write_png(output_file_name,
+    int write_res2 = stbi_write_png(output_file_name,
                                    output_width,
                                    output_height,
                                    output_bytes_per_pixel,
                                    output_image_data,
                                    0);
-    if (!write_res) {
+    if (!write_res2) {
         std::cerr << "Error: can not write image to file by path: "
                   << output_file_name << std::endl;
 
@@ -168,6 +185,7 @@ int main(int argc, char *argv[]) {
 
     // free data:
     delete[] output_image_data;
+    delete[] labeled_data;
     stbi_image_free(input_image_data);
 
     return 0;
@@ -305,7 +323,110 @@ void MedianFilter2D(const unsigned char* pSrc, unsigned char* pRes, int iWidth, 
             }
 
             std::sort(window.begin(), window.end());
-            pRes[y * iWidth + x] = window[window.size() / 2];
+            if (window.size() % 2 == 1) {
+                pRes[y * iWidth + x] = window[window.size() / 2];
+            } else {
+                pRes[y * iWidth + x] = (window[window.size() / 2 - 1] + window[window.size() / 2]) / 2.0;
+            }
         }
     }
+}
+
+void ThresholdSegmentation(const unsigned char* pSrc, unsigned char* pRes, int iWidth, int iHeight, unsigned char threshold) {
+    for (int i = 0; i < iWidth * iHeight; ++i) {
+        pRes[i] = (pSrc[i] >= threshold) ? 255 : 0;
+    }
+}
+
+void ConnectedComponentLabeling(const unsigned char* pBin, unsigned char* pLabel, int iWidth, int iHeight, int connectivity) {
+    memset(pLabel, 0, iWidth * iHeight);
+
+    int label = 1;
+    std::vector<std::pair<int, int>> directions;
+
+    if (connectivity == 4) {
+        directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    } else if (connectivity == 8) {
+        directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, 1}, {-1, 1}, {1, -1}};
+    }
+
+    for (int y = 0; y < iHeight; ++y) {
+        for (int x = 0; x < iWidth; ++x) {
+            if (pBin[y * iWidth + x] == 255 && pLabel[y * iWidth + x] == 0) {
+
+                std::queue<std::pair<int, int>> q;
+                q.push({x, y});
+                pLabel[y * iWidth + x] = label;
+
+                while (!q.empty()) {
+                    std::pair<int, int> front = q.front();
+                    int cx = front.first;
+                    int cy = front.second;
+                    q.pop();
+
+
+                    for (const auto& dir : directions) {
+                        int dx = dir.first;
+                        int dy = dir.second;
+
+                        int nx = cx + dx;
+                        int ny = cy + dy;
+
+                        if (nx >= 0 && nx < iWidth && ny >= 0 && ny < iHeight &&
+                            pBin[ny * iWidth + nx] == 255 && pLabel[ny * iWidth + nx] == 0) {
+                            pLabel[ny * iWidth + nx] = label;
+                            q.push({nx, ny});
+                        }
+                    }
+                }
+
+                ++label;
+            }
+        }
+    }
+
+    std::vector<int> region_sizes(label, 0);
+
+    for (int i = 0; i < iWidth * iHeight; ++i) {
+        if (pLabel[i] > 0) {
+            region_sizes[pLabel[i]]++;
+        }
+    }
+
+    std::vector<std::pair<int, int>> regions;
+    for (int i = 1; i < label; ++i) {
+        regions.push_back({region_sizes[i], i});
+    }
+
+    std::sort(regions.begin(), regions.end(), [](const std::pair<int, int>& a, const std::pair<int, int>& b) {return a.first > b.first;});
+
+    std::unordered_set<int> top_labels;
+
+    int max_zones = 100;
+    for (int i = 0; i < std::min(max_zones, static_cast<int>(regions.size())); ++i) {
+        top_labels.insert(regions[i].second); 
+    }
+
+    for (int i = 0; i < iWidth * iHeight; ++i) {
+        if (top_labels.find(pLabel[i]) == top_labels.end()) pLabel[i] = 0;
+    }
+
+    std::unordered_map<int, int> new_labels;
+    int new_label = 1;
+
+    for (int label : top_labels) {
+        new_labels[label] = new_label++;
+    }
+
+    for (int i = 0; i < iWidth * iHeight; ++i) {
+        if (pLabel[i] > 0) {
+            pLabel[i] = new_labels[pLabel[i]];
+        }
+    }
+
+    for (int i = 0; i < iWidth * iHeight; ++i) {
+        if (pLabel[i] > 0) pLabel[i] = static_cast<unsigned char>(2 * pLabel[i]);
+    }
+
+
 }
